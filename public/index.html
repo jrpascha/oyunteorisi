@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Oyun Teorisi</title>
+<link rel="stylesheet" href="/css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23f3e9d2'/><circle cx='11' cy='16' r='7' fill='%232f7d32' stroke='%232b2018' stroke-width='2'/><circle cx='21' cy='16' r='7' fill='%23c0392b' stroke='%232b2018' stroke-width='2'/></svg>">
+</head>
+<body>
+<a href="/siralama" class="corner-link corner-link-left">SIRALAMA</a>
+<div class="wrap landing">
+
+  <h1 class="title">Oyun Teorisi</h1>
+  <p class="tagline">İki kişi. Çok tur. Her turda tek karar:<br>işbirliği mi, ret mi?<span class="cursor"></span></p>
+
+  <div class="menu">
+    <button class="btn btn-lg btn-primary" id="show-start">Oyuna Başla</button>
+    <button class="btn btn-lg" id="show-world">Dünya Çapında Oyna</button>
+    <button class="btn btn-lg" id="show-how">Nasıl Oynanır?</button>
+    <button class="btn btn-lg" id="show-purpose">Oyunun Amacı</button>
+  </div>
+
+  <!-- Oyuna başla -->
+  <div class="panel hidden" id="start-panel" style="width:min(640px,100%)">
+    <h2>Oyunu Kur</h2>
+    <div id="error" class="error hidden"></div>
+
+    <div class="field">
+      <label for="nickname">Takma adın</label>
+      <input type="text" id="nickname" maxlength="20" placeholder="örn. Ahmet" autocomplete="off">
+    </div>
+
+    <div class="field">
+      <label>Maç uzunluğu</label>
+      <div class="duration-options" id="duration-options" role="radiogroup" aria-label="Maç uzunluğu">
+        <label class="duration-card">
+          <input type="radio" name="preset" value="short">
+          <span class="dc-head">
+            <span class="dc-name">Kısa</span>
+            <span class="dc-range">10–20 tur</span>
+          </span>
+          <span class="dc-row dc-good">+ Hızlı biter, tek oturumda kolayca tamamlanır</span>
+          <span class="dc-row dc-bad">− Güven kurmaya vakit yok, bir erken hata maçı belirler</span>
+        </label>
+
+        <label class="duration-card">
+          <input type="radio" name="preset" value="medium" checked>
+          <span class="dc-head">
+            <span class="dc-name">Orta</span>
+            <span class="dc-range">40–50 tur</span>
+          </span>
+          <span class="dc-row dc-good">+ Strateji kurmaya ve rakibi okumaya yeter</span>
+          <span class="dc-row dc-bad">− Kısa kadar hızlı, uzun kadar derin değil</span>
+        </label>
+
+        <label class="duration-card">
+          <input type="radio" name="preset" value="long">
+          <span class="dc-head">
+            <span class="dc-name">Uzun</span>
+            <span class="dc-range">80–90 tur</span>
+          </span>
+          <span class="dc-row dc-good">+ Güven gerçekten sınanır, oyun tarzı netleşir</span>
+          <span class="dc-row dc-bad">− Sürer, tek oturumda bitirmek zaman ister</span>
+        </label>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="create">Bağlantı Oluştur</button>
+    <p class="small muted" style="margin:14px 0 0">
+      Oluşan bağlantıyı rakibine gönder. O bağlantıyı açtığı an maç başlar. Gerçek tur sayısı
+      seçtiğin aralıkta rastgele belirlenir ve maç bitene kadar kimseye söylenmez.
+    </p>
+  </div>
+
+  <!-- Dünya çapında oyna -->
+  <div class="panel hidden" id="world-panel">
+    <h2>Dünya Çapında Oyna</h2>
+    <div id="world-error" class="error hidden"></div>
+
+    <div id="world-form">
+      <div class="field">
+        <label for="world-nickname">Takma adın</label>
+        <input type="text" id="world-nickname" maxlength="20" placeholder="örn. Ahmet" autocomplete="off">
+      </div>
+      <p class="small muted" style="margin-bottom:16px">
+        Rakibin dünya çapında rastgele bir oyuncu olur. Uzunluk sabit: <strong>Uzun
+        (80–90 tur)</strong>. Sonucun <a href="/siralama">dünya sıralamasına</a> yansır.
+      </p>
+      <button class="btn btn-primary" id="find-match">Eşleşme Ara</button>
+    </div>
+
+    <div id="world-waiting" class="hidden">
+      <p class="center" style="margin-bottom:16px">
+        Rakip aranıyor<span class="cursor"></span>
+      </p>
+      <div class="center">
+        <button class="btn" id="cancel-match">İptal Et</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Nasıl oynanır -->
+  <div class="panel hidden" id="how-panel">
+    <h2>Nasıl Oynanır</h2>
+
+    <table class="payoff">
+      <thead>
+        <tr>
+          <th></th>
+          <th>Rakip:<br>İşbirliği</th>
+          <th>Rakip:<br>Ret</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th>Sen:<br>İşbirliği</th>
+          <td><span class="pts">3</span> — 3</td>
+          <td><span class="pts">0</span> — 5</td>
+        </tr>
+        <tr>
+          <th>Sen:<br>Ret</th>
+          <td><span class="pts">5</span> — 0</td>
+          <td><span class="pts">1</span> — 1</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="small muted">
+      Soldaki puan senin, sağdaki rakibinin. Her turda ret çekmek o turun daha kârlı seçimidir —
+      ama iki taraf da öyle düşünürse ikiniz de tur başına 1 puana razı olursunuz. İkilem budur.
+    </p>
+
+    <ul class="rules-list">
+      <li>Seçimini yaptığın anda tercihin <strong>kilitlenir</strong> ve rakip seçene kadar ona gösterilmez.</li>
+      <li>İkiniz de seçince sonuç aynı anda açılır ve puanlar işlenir.</li>
+      <li>Ekranda <strong>yalnızca kendi puanını</strong> görürsün; rakibinki maçın sonuna kadar gizlidir.</li>
+      <li>Geçmiş turlardan yalnızca <strong>son birkaçı</strong> ekranda kalır; maç ilerledikçe pencere genişler.</li>
+      <li>Maç <strong>kaç tur süreceği söylenmeden</strong> oynanır. Son turu bilemezsin.</li>
+      <li>Bitişte iki oyuncunun da oyun tarzına göre <strong>strateji ve kişilik analizi</strong> çıkar.</li>
+    </ul>
+  </div>
+
+  <!-- Oyunun amacı -->
+  <div class="panel hidden" id="purpose-panel">
+    <h2>Oyunun Amacı</h2>
+
+    <p>
+      Bu oyunda kazanmak, rakibini yenmek değildir. Skor tablosunda kimin önde olduğu seni
+      ilgilendirmesin — tek işin, maç boyunca <strong>kendi toplam puanını</strong> olabildiğince
+      yükseltmiş olmak. Rakibinin çok puan toplaması senin kaybın değildir; ikinizin de çok
+      puan toplaması pekâlâ mümkündür, ikinizin de az toplaması da.
+    </p>
+
+    <p class="small muted">
+      Gerçek hayatta da böyledir. İş ortaklıkları, arkadaşlıklar, komşuluklar — kurduğumuz
+      ilişkiler çoğu zaman "ya sen ya ben" biçiminde işlemez. Karşındakine güvenip elini
+      açtığında, o da elini açarsa ikiniz de kazanırsınız; hayat kaliteniz birlikte yükselir.
+      Güven kırıldığında ise genellikle ikiniz de kaybedersiniz — biri kısa vadede diğerini
+      sömürebilir, ama bu döngü uzun sürmez ve sonunda ikiniz de birbirinize kapanmış olursunuz.
+    </p>
+
+    <p class="small muted" style="margin-bottom:0">
+      İşte bu yüzden tek başına "akıllı" bir hamle yoktur. En yüksek puan çoğu zaman rakibini
+      alt etmekten değil, onunla birlikte bir güven inşa edebilmekten gelir. Ama bu güvenin bir
+      bedeli vardır: her seferinde yeniden sömürülme riskini göze almak. Oyun boyunca asıl
+      sınadığın şey rakibin değil, bu riski nasıl yönettiğindir.
+    </p>
+  </div>
+
+</div>
+
+<script src="/js/sound.js"></script>
+<script src="/js/identity.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<script src="/js/home.js"></script>
+</body>
+</html>
