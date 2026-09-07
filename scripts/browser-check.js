@@ -109,6 +109,18 @@ if (landing.title.toLocaleUpperCase('tr') !== 'OYUN TEORİSİ') {
 if (!landing.startHidden || !landing.howHidden) problems.push('Açılışta paneller kapalı olmalı');
 if (/mahkûm|mahkum/i.test(landing.bodyText)) problems.push('Açılışta "Mahkûm İkilemi" hâlâ geçiyor');
 
+/** Hangi menü butonunun turuncu (btn-primary, yani "paneli açık") göründüğünü döner. */
+const activeMenuButton = (page) =>
+  page.evaluate(() => {
+    const ids = ['show-start', 'show-world', 'show-how', 'show-purpose'];
+    return ids.filter((id) => document.getElementById(id).classList.contains('btn-primary'));
+  });
+
+const initialActive = await activeMenuButton(host);
+if (initialActive.length !== 0) {
+  problems.push(`Açılışta hiçbir panel açık değilken şu butonlar turuncu görünüyor: ${initialActive.join(', ')}`);
+}
+
 // ---------- 1b. Ses aç/kapa düğmesi ----------
 
 const initiallyMuted = await host.evaluate(() => window.OTSound.isMuted());
@@ -138,7 +150,11 @@ await shot(host, '02-nasil-oynanir');
 if ((await soundCalls(host)).click !== 1) {
   problems.push(`"Nasıl oynanır" tıklaması tam olarak bir kez ses çalmalı, sayı: ${(await soundCalls(host)).click}`);
 }
-step('"Nasıl oynanır" paneli açıldı, tıklama sesi bir kez çaldı');
+const activeAfterHow = await activeMenuButton(host);
+if (activeAfterHow.length !== 1 || activeAfterHow[0] !== 'show-how') {
+  problems.push(`"Nasıl oynanır" açıkken turuncu buton(lar): ${activeAfterHow.join(', ') || 'yok'} — yalnızca show-how olmalıydı`);
+}
+step('"Nasıl oynanır" paneli açıldı, tıklama sesi bir kez çaldı, buton turuncuya döndü');
 
 // ---------- 1d. Oyunun amacı ----------
 
@@ -153,8 +169,12 @@ if (/mahkûm|mahkum/i.test(purposeText)) {
 if (!/kendi (toplam )?puan/i.test(purposeText) || !/rakib/i.test(purposeText)) {
   problems.push('"Oyunun amacı" paneli temel hatırlatmayı içermiyor gibi görünüyor');
 }
+const activeAfterPurpose = await activeMenuButton(host);
+if (activeAfterPurpose.length !== 1 || activeAfterPurpose[0] !== 'show-purpose') {
+  problems.push(`"Oyunun amacı" açıkken turuncu buton(lar): ${activeAfterPurpose.join(', ') || 'yok'} — yalnızca show-purpose olmalıydı`);
+}
 await shot(host, '02b-oyunun-amaci');
-step('"Oyunun amacı" paneli açıldı, oyunun adını sızdırmadı');
+step('"Oyunun amacı" paneli açıldı, oyunun adını sızdırmadı, buton turuncuya döndü');
 
 await host.click('#show-start');
 await host.waitForSelector('#start-panel:not(.hidden)', { timeout: 5000 });
@@ -433,6 +453,12 @@ await worldB.goto(URL, { waitUntil: 'networkidle0' });
 
 await worldA.click('#show-world');
 await worldA.waitForSelector('#world-panel:not(.hidden)', { timeout: 5000 });
+const activeAfterWorld = await activeMenuButton(worldA);
+if (activeAfterWorld.length !== 1 || activeAfterWorld[0] !== 'show-world') {
+  problems.push(
+    `"Dünya Çapında Oyna" tıklandığında turuncu buton(lar): ${activeAfterWorld.join(', ') || 'yok'} — yalnızca show-world olmalıydı`,
+  );
+}
 await worldA.type('#world-nickname', 'Zeynep');
 await worldA.click('#find-match');
 await worldA.waitForSelector('#world-waiting:not(.hidden)', { timeout: 5000 });

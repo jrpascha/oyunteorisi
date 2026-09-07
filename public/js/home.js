@@ -8,6 +8,20 @@
   const purposePanel = $('purpose-panel');
   const panels = [startPanel, worldPanel, howPanel, purposePanel];
 
+  // Panelini açan menü butonu turuncuya döner (aynı anda en fazla bir tanesi) —
+  // aksi halde bir butona tıklandığında hiçbir görsel geri bildirim olmuyordu.
+  const menuButtons = [
+    { btn: $('show-start'), panel: startPanel },
+    { btn: $('show-world'), panel: worldPanel },
+    { btn: $('show-how'), panel: howPanel },
+    { btn: $('show-purpose'), panel: purposePanel },
+  ];
+  function syncMenuButtons() {
+    menuButtons.forEach(({ btn, panel }) => {
+      btn.classList.toggle('btn-primary', !panel.classList.contains('hidden'));
+    });
+  }
+
   const nicknameInput = $('nickname');
   const createBtn = $('create');
   const errorBox = $('error');
@@ -40,6 +54,7 @@
     const willOpen = panel.classList.contains('hidden');
     panels.forEach((p) => p.classList.add('hidden'));
     if (willOpen) panel.classList.remove('hidden');
+    syncMenuButtons();
     return willOpen;
   }
 
