@@ -10,6 +10,10 @@ function ratio(hits, total) {
   return total === 0 ? 0 : hits / total;
 }
 
+function pct(x) {
+  return Math.round(x * 100) + '%';
+}
+
 function coopRateOf(moves) {
   return ratio(moves.filter((m) => m === COOPERATE).length, moves.length);
 }
@@ -291,6 +295,184 @@ function metricBars(m) {
 }
 
 /**
+ * İkilinin uyumu: arketiplerden farklı olarak tek bir oyuncuyu değil,
+ * ÇİFTİN ortak davranışını değerlendirir — ilişki metrikleri (karşılıklı
+ * işbirliği/ret, sömürü dengesi) ve iki oyuncunun bağışlayıcılık/kin/sona
+ * doğru değişim ortalamalarından çıkarılır.
+ */
+export function pairMetrics(relationship, totalRounds, mA, mB) {
+  const n = Math.max(1, totalRounds);
+  return {
+    mutualCoopShare: relationship.mutualCoopRounds / n,
+    mutualDefectShare: relationship.mutualDefectRounds / n,
+    exploitationAsymmetry: Math.abs(relationship.exploitedBy[0] - relationship.exploitedBy[1]) / n,
+    totalExploitShare: (relationship.exploitedBy[0] + relationship.exploitedBy[1]) / n,
+    avgForgiveness: (mA.forgivenessRate + mB.forgivenessRate) / 2,
+    avgGrudge: (Math.max(0, mA.grudgeScore) + Math.max(0, mB.grudgeScore)) / 2,
+    avgEndgameShift: (mA.endgameShift + mB.endgameShift) / 2,
+    minEndgameShift: Math.min(mA.endgameShift, mB.endgameShift),
+    avgUnpredictability:
+      (mA.entropy * (0.4 + 0.6 * mA.switchRate) + mB.entropy * (0.4 + 0.6 * mB.switchRate)) / 2,
+    hadBetrayal: relationship.firstDefectionRound !== null,
+  };
+}
+
+/**
+ * Uyum profilleri. Her biri ilişki metriklerinden 0..1 arası bir uyum puanı
+ * üretir; en yüksek puanlı kazanır. `predictions`, gerçek hayattaki olası
+ * senaryolara dair, bu maçın gerçek sayılarına dayanan tahminler döner.
+ */
+const COMPATIBILITY_PROFILES = [
+  {
+    id: 'perfect-sync',
+    name: 'Mükemmel Senkron',
+    verdict: 'Neredeyse kusursuz bir uyum yakaladınız.',
+    score: (pm) =>
+      band(pm.mutualCoopShare, 0.68, 0.95) *
+      band(1 - pm.avgGrudge, 0.7, 1) *
+      band(1 - Math.max(0, -pm.avgEndgameShift), 0.6, 1),
+    predictions: (pm) => [
+      `Turların ${pct(pm.mutualCoopShare)}'inde ikiniz de aynı anda işbirliğini seçtiniz — iki yabancının rastgele eşleşmesinde ender rastlanan bir oran.`,
+      'Uzun bir yol yolculuğuna çıksanız kararları birlikte alır, biriniz yorulduğunda diğeri yükü sessizce üstlenir.',
+      'Ortak bir iş kursanız güven zaten hazır durumda — geriye sadece işin detaylarını konuşmak kalır.',
+      'Bu uyumun sırrı basit: ikiniz de karşılıklı güveni bozmanın kısa vadeli kazançtan daha değerli olduğunu oyun boyunca gösterdiniz.',
+    ],
+  },
+  {
+    id: 'trust-partnership',
+    name: 'Güvene Dayalı Ortaklık',
+    verdict: 'Aranızda sağlam, işleyen bir güven kuruldu.',
+    score: (pm) => {
+      // Çok yüksek mutualCoopShare "Mükemmel Senkron"un alanı — burada geri çekil.
+      const gate = pm.mutualCoopShare < 0.75 ? 1 : 0.25;
+      return (
+        gate *
+        band(pm.mutualCoopShare, 0.32, 0.62) *
+        band(pm.avgForgiveness, 0.3, 0.7) *
+        band(1 - pm.avgGrudge, 0.3, 0.75)
+      );
+    },
+    predictions: (pm) => [
+      `Karşılıklı işbirliği oranınız ${pct(pm.mutualCoopShare)} — mükemmel değil ama net biçimde güven yönünde.`,
+      'Uzun bir yolculuk ya da ortak bir proje makul bir risk sizin için; küçük sürtüşmeler çıksa da ilişkiyi yıkacak kadar büyümüyor.',
+      'Bir iş ortaklığında kriz anında birbirinizi terk etmek yerine önce konuşmayı denersiniz.',
+      'Zaman zaman temkinli davransanız da genel eğilim rakibe kredi tanımak yönünde.',
+    ],
+  },
+  {
+    id: 'fragile-trust',
+    name: 'Kırılgan Güven',
+    verdict: 'Bir kırılma yaşadınız ama tamamen kopmadınız.',
+    score: (pm) => {
+      const gate = pm.hadBetrayal ? 1 : 0.12;
+      return (
+        gate *
+        band(pm.avgGrudge, 0.08, 0.35) *
+        band(pm.avgForgiveness, 0.12, 0.6) *
+        band(pm.mutualCoopShare, 0.12, 0.45)
+      );
+    },
+    predictions: () => [
+      'Aranızda en az bir ihanet yaşandı; işbirliği bir süre düştü ama sıfırlanmadı — kısmi bir toparlanma oldu.',
+      'Kısa süreli, net kuralları olan bir işbirliği (tek seferlik bir görev gibi) şu an uzun soluklu bir ortaklıktan daha güvenli.',
+      'Uzun bir yolculuğa çıkmadan önce aranızdaki o ilk kırılmayı konuşmanızda fayda var — telafi edilmemiş bir gerginlik hâlâ orada olabilir.',
+      'Bir iş ortaklığı kurarsanız, kim ne zaman ne yapacak gibi net ve yazılı kurallar güveni yeniden oturtmanıza yardımcı olur.',
+    ],
+  },
+  {
+    id: 'imbalanced',
+    name: 'Dengesiz İlişki',
+    verdict: 'İlişki eşit şartlarda ilerlemedi.',
+    score: (pm) => band(pm.exploitationAsymmetry, 0.05, 0.22) * band(pm.totalExploitShare, 0.12, 0.4),
+    predictions: (pm) => [
+      `Sömürünün büyük kısmı tek yönlüydü — turların ${pct(pm.totalExploitShare)}'i bir tarafın diğerinden çıkar sağladığı turlardı.`,
+      'Bir iş ortaklığında bu dinamik tehlikeli: taraflardan biri sürekli veren, diğeri sürekli alan konumunda kalabilir.',
+      'Uzun bir yolculukta kararları kim alıyor, masrafları kim karşılıyor gibi sorular önceden netleşmeli — aksi halde biri hep taviz veren taraf olur.',
+      'Bu dengesizliği ikiniz de fark edip konuşursanız, ilişki çok daha sağlıklı bir zemine oturabilir.',
+    ],
+  },
+  {
+    id: 'mutual-hawks',
+    name: 'Karşılıklı Şahin',
+    verdict: 'İkiniz de büyük ölçüde temkinli ve kapalı kaldınız.',
+    score: (pm) => band(pm.mutualDefectShare, 0.28, 0.7) * band(1 - pm.mutualCoopShare, 0.5, 0.9),
+    predictions: (pm) => [
+      `Turların ${pct(pm.mutualDefectShare)}'inde ikiniz de reddi seçtiniz — karşılıklı güvensizlik baskın strateji oldu.`,
+      'Ortak bir iş ya da uzun bir yolculuk şu an için riskli görünüyor; ikiniz de önce kendi çıkarını gözetme refleksiyle hareket ediyor.',
+      'Bu, kötü insanlar olduğunuz anlamına gelmez — ikiniz de aynı temkinli mantıkla oynadınız ve birbirinizi bu tuzağa kilitlediniz.',
+      'Küçük, düşük riskli bir görevle başlayıp güveni adım adım inşa etmek, doğrudan büyük bir taahhüde girmekten daha mantıklı olur.',
+    ],
+  },
+  {
+    id: 'endgame-cooling',
+    name: 'Sona Doğru Soğuma',
+    verdict: 'İyi başladınız ama sona doğru soğudunuz.',
+    score: (pm) => band(pm.mutualCoopShare, 0.25, 0.6) * band(-pm.minEndgameShift, 0.18, 0.55),
+    predictions: () => [
+      'Maçın büyük bölümünde işbirlikçiydiniz, ama son turlara doğru en az biriniz geri çekildi.',
+      'Kısa vadeli, net bir bitiş çizgisi olan işler (bir haftalık proje, kısa bir tatil) sizin için sorun olmaz.',
+      'Ama sonu belirsiz, uzun soluklu bir taahhütte (uzun bir yolculuk, süresiz bir ortaklık gibi) bitişe yaklaşırken gerginlik çıkabilir.',
+      "Bunun sebebi kötü niyet değil — sona yaklaşıldığını hissetmenin doğal bir sonucu. Baştan bir 'çıkış planı' konuşmak işe yarayabilir.",
+    ],
+  },
+  {
+    id: 'unpredictable',
+    name: 'Öngörülemez Eşleşme',
+    verdict: 'Bir örüntü bulmak zor — davranışlarınız dalgalandı.',
+    score: (pm) => band(pm.avgUnpredictability, 0.3, 0.65),
+    predictions: () => [
+      'Hamleleriniz turdan tura tutarlı bir kalıba oturmadı; birbirinizi okumakta zorlanmış olabilirsiniz.',
+      'Uzun vadeli, yüksek riskli bir ortaklığa (uzun bir yolculuk, bir iş kurmak gibi) girmeden önce birbirinizi daha çok tanımanızda fayda var.',
+      'Kısa, tekrar oynanabilir görevler öngörülemezliğin zararını sınırlı tutar.',
+      'Zamanla birbirinizin tarzını öğrendikçe bu belirsizlik azalabilir — bu yalnızca tek bir maçın fotoğrafı.',
+    ],
+  },
+];
+
+const COMPATIBILITY_FALLBACK = {
+  id: 'undetermined',
+  name: 'Belirsiz Uyum',
+  verdict: 'Net bir eğilim ortaya çıkmadı.',
+  predictions: () => [
+    'Bu maçtaki davranışlarınız yukarıdaki profillerden hiçbirine güçlü biçimde oturmadı.',
+    'Daha uzun bir maç ya da başka bir eşleşme, aranızdaki dinamiği daha net ortaya çıkarabilir.',
+    'Şimdilik büyük ortak taahhütlere (uzun bir yolculuk, bir iş ortaklığı) girmeden önce küçük, düşük riskli bir deneme yapmanız mantıklı olur.',
+  ],
+};
+
+/** İlişki metriklerinden en iyi uyan uyum profilini + güven yüzdesini seçer. */
+export function classifyCompatibility(pm) {
+  const scored = COMPATIBILITY_PROFILES.map((p) => ({ profile: p, score: p.score(pm) })).sort(
+    (x, y) => y.score - x.score,
+  );
+  const best = scored[0];
+  const runnerUp = scored[1];
+
+  if (!best || best.score < 0.3) {
+    return {
+      id: COMPATIBILITY_FALLBACK.id,
+      name: COMPATIBILITY_FALLBACK.name,
+      verdict: COMPATIBILITY_FALLBACK.verdict,
+      predictions: COMPATIBILITY_FALLBACK.predictions(pm),
+      confidence: 0.45,
+      runnerUp: best?.profile.name ?? null,
+    };
+  }
+
+  const gap = best.score - (runnerUp?.score ?? 0);
+  const confidence = Math.min(0.99, 0.5 + 0.35 * best.score + 0.3 * gap);
+
+  return {
+    id: best.profile.id,
+    name: best.profile.name,
+    verdict: best.profile.verdict,
+    predictions: best.profile.predictions(pm),
+    confidence,
+    runnerUp: runnerUp && runnerUp.score > 0.4 ? runnerUp.profile.name : null,
+  };
+}
+
+/**
  * Maçın tamamını analiz eder.
  * history: [{ round, moves: [p0, p1], points: [p0, p1] }]
  * players: [{ nickname, score }]
@@ -333,34 +515,31 @@ export function analyzeMatch(history, players) {
   const totalScored = players[0].score + players[1].score;
   const bestPossibleTogether = 2 * PAYOFF.R * n;
 
-  // Tur tur puan birikimi (sonuç ekranındaki grafik için)
-  const cumulative = [[], []];
-  let running = [0, 0];
-  for (const h of history) {
-    running = [running[0] + h.points[0], running[1] + h.points[1]];
-    cumulative[0].push(running[0]);
-    cumulative[1].push(running[1]);
-  }
+  const relationship = {
+    mutualCoopRounds: mutualCoop,
+    mutualDefectRounds: mutualDefect,
+    exploitedBy,
+    firstDefectionRound: firstDefectionRound === -1 ? null : firstDefectionRound + 1,
+    firstDefector,
+    longestTrustStreak: Math.max(
+      playerReports[0].metrics.longestMutualCoop,
+      playerReports[1].metrics.longestMutualCoop,
+    ),
+    totalScored,
+    bestPossibleTogether,
+    efficiency: bestPossibleTogether === 0 ? 0 : totalScored / bestPossibleTogether,
+    pointsBurned: bestPossibleTogether - totalScored,
+  };
+
+  const compatibility = classifyCompatibility(
+    pairMetrics(relationship, n, playerReports[0].metrics, playerReports[1].metrics),
+  );
 
   return {
     totalRounds: n,
     players: playerReports,
-    relationship: {
-      mutualCoopRounds: mutualCoop,
-      mutualDefectRounds: mutualDefect,
-      exploitedBy,
-      firstDefectionRound: firstDefectionRound === -1 ? null : firstDefectionRound + 1,
-      firstDefector,
-      longestTrustStreak: Math.max(
-        playerReports[0].metrics.longestMutualCoop,
-        playerReports[1].metrics.longestMutualCoop,
-      ),
-      totalScored,
-      bestPossibleTogether,
-      efficiency: bestPossibleTogether === 0 ? 0 : totalScored / bestPossibleTogether,
-      pointsBurned: bestPossibleTogether - totalScored,
-    },
-    cumulative,
+    relationship,
+    compatibility,
   };
 }
 

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { COOPERATE as C, DEFECT as D, scoreRound } from '../server/gameLogic.js';
-import { analyzeMatch, classify, playerMetrics } from '../server/analysis.js';
+import { analyzeMatch, classify, classifyCompatibility, playerMetrics } from '../server/analysis.js';
 
 const N = 100;
 
@@ -89,7 +89,7 @@ test('metrikler temel davranışları doğru ölçüyor', () => {
   assert.equal(m.longestMutualCoop, 1);
 });
 
-test('analyzeMatch ilişki metriklerini ve kümülatif puanı doğru üretiyor', () => {
+test('analyzeMatch ilişki metriklerini doğru üretiyor', () => {
   const own = [C, C, D, D];
   const opp = [C, D, D, C];
   const history = buildHistory(own, opp);
@@ -111,11 +111,179 @@ test('analyzeMatch ilişki metriklerini ve kümülatif puanı doğru üretiyor',
   assert.equal(r.bestPossibleTogether, 24);
   assert.equal(r.totalScored, players[0].score + players[1].score);
   assert.equal(r.pointsBurned, 24 - r.totalScored);
+});
 
-  // Kümülatif seriler tur sayısı kadar ve son değerleri toplam puana eşit olmalı
-  assert.equal(result.cumulative[0].length, 4);
-  assert.equal(result.cumulative[0].at(-1), players[0].score);
-  assert.equal(result.cumulative[1].at(-1), players[1].score);
+// ---------- classifyCompatibility ----------
+//
+// pairMetrics'in ilişki+iki oyuncu metriklerinden ürettiği şekle uyan sentetik
+// girdilerle her profilin doğru koşulda kazandığını doğrular.
+
+test('yüksek karşılıklı işbirliği + kinsiz + iyi biten maç → Mükemmel Senkron', () => {
+  const pm = {
+    mutualCoopShare: 0.85,
+    mutualDefectShare: 0.02,
+    exploitationAsymmetry: 0.02,
+    totalExploitShare: 0.05,
+    avgForgiveness: 0.9,
+    avgGrudge: 0.02,
+    avgEndgameShift: 0.02,
+    minEndgameShift: 0,
+    avgUnpredictability: 0.1,
+    hadBetrayal: false,
+  };
+  assert.equal(classifyCompatibility(pm).id, 'perfect-sync');
+});
+
+test('orta düzey karşılıklı işbirliği + iyi affedicilik → Güvene Dayalı Ortaklık', () => {
+  const pm = {
+    mutualCoopShare: 0.5,
+    mutualDefectShare: 0.1,
+    exploitationAsymmetry: 0.03,
+    totalExploitShare: 0.15,
+    avgForgiveness: 0.55,
+    avgGrudge: 0.12,
+    avgEndgameShift: 0,
+    minEndgameShift: -0.05,
+    avgUnpredictability: 0.2,
+    hadBetrayal: true,
+  };
+  assert.equal(classifyCompatibility(pm).id, 'trust-partnership');
+});
+
+test('ihanet + kısmi toparlanma → Kırılgan Güven', () => {
+  const pm = {
+    mutualCoopShare: 0.35,
+    mutualDefectShare: 0.15,
+    exploitationAsymmetry: 0.05,
+    totalExploitShare: 0.25,
+    avgForgiveness: 0.5,
+    avgGrudge: 0.25,
+    avgEndgameShift: -0.05,
+    minEndgameShift: -0.1,
+    avgUnpredictability: 0.25,
+    hadBetrayal: true,
+  };
+  assert.equal(classifyCompatibility(pm).id, 'fragile-trust');
+});
+
+test('tek yönlü sömürü → Dengesiz İlişki', () => {
+  const pm = {
+    mutualCoopShare: 0.25,
+    mutualDefectShare: 0.1,
+    exploitationAsymmetry: 0.15,
+    totalExploitShare: 0.3,
+    avgForgiveness: 0.3,
+    avgGrudge: 0.1,
+    avgEndgameShift: -0.05,
+    minEndgameShift: -0.1,
+    avgUnpredictability: 0.2,
+    hadBetrayal: true,
+  };
+  assert.equal(classifyCompatibility(pm).id, 'imbalanced');
+});
+
+test('yüksek karşılıklı ret → Karşılıklı Şahin', () => {
+  const pm = {
+    mutualCoopShare: 0.05,
+    mutualDefectShare: 0.55,
+    exploitationAsymmetry: 0.03,
+    totalExploitShare: 0.1,
+    avgForgiveness: 0.2,
+    avgGrudge: 0.05,
+    avgEndgameShift: 0,
+    minEndgameShift: 0,
+    avgUnpredictability: 0.15,
+    hadBetrayal: true,
+  };
+  assert.equal(classifyCompatibility(pm).id, 'mutual-hawks');
+});
+
+test('iyi giden maç + belirgin son tur düşüşü → Sona Doğru Soğuma', () => {
+  const pm = {
+    mutualCoopShare: 0.4,
+    mutualDefectShare: 0.15,
+    exploitationAsymmetry: 0.04,
+    totalExploitShare: 0.15,
+    avgForgiveness: 0.5,
+    avgGrudge: 0.1,
+    avgEndgameShift: -0.2,
+    minEndgameShift: -0.45,
+    avgUnpredictability: 0.2,
+    hadBetrayal: true,
+  };
+  assert.equal(classifyCompatibility(pm).id, 'endgame-cooling');
+});
+
+test('yüksek öngörülemezlik → Öngörülemez Eşleşme', () => {
+  const pm = {
+    mutualCoopShare: 0.3,
+    mutualDefectShare: 0.2,
+    exploitationAsymmetry: 0.04,
+    totalExploitShare: 0.15,
+    avgForgiveness: 0.4,
+    avgGrudge: 0.1,
+    avgEndgameShift: 0,
+    minEndgameShift: -0.05,
+    avgUnpredictability: 0.55,
+    hadBetrayal: true,
+  };
+  assert.equal(classifyCompatibility(pm).id, 'unpredictable');
+});
+
+test('hiçbir profile net oturmayan nötr metrikler → Belirsiz Uyum', () => {
+  const pm = {
+    mutualCoopShare: 0.3,
+    mutualDefectShare: 0.1,
+    exploitationAsymmetry: 0.02,
+    totalExploitShare: 0.05,
+    avgForgiveness: 0.5,
+    avgGrudge: 0.05,
+    avgEndgameShift: 0,
+    minEndgameShift: 0,
+    avgUnpredictability: 0.15,
+    hadBetrayal: false,
+  };
+  const result = classifyCompatibility(pm);
+  assert.equal(result.id, 'undetermined');
+  assert.ok(result.predictions.length > 0);
+});
+
+test('classifyCompatibility her zaman isim, özet ve en az bir tahmin döner', () => {
+  const pm = {
+    mutualCoopShare: 0.5,
+    mutualDefectShare: 0.1,
+    exploitationAsymmetry: 0.03,
+    totalExploitShare: 0.13,
+    avgForgiveness: 0.5,
+    avgGrudge: 0.1,
+    avgEndgameShift: 0,
+    minEndgameShift: 0,
+    avgUnpredictability: 0.2,
+    hadBetrayal: true,
+  };
+  const result = classifyCompatibility(pm);
+  assert.ok(result.name);
+  assert.ok(result.verdict);
+  assert.ok(Array.isArray(result.predictions) && result.predictions.every((p) => typeof p === 'string'));
+  assert.ok(result.confidence > 0 && result.confidence <= 1);
+});
+
+test('analyzeMatch bir uyum profili döner', () => {
+  const own = [C, C, D, D];
+  const opp = [C, D, D, C];
+  const history = buildHistory(own, opp);
+  const players = [
+    { nickname: 'A', score: history.reduce((s, h) => s + h.points[0], 0) },
+    { nickname: 'B', score: history.reduce((s, h) => s + h.points[1], 0) },
+  ];
+
+  const result = analyzeMatch(history, players);
+  const c = result.compatibility;
+
+  assert.ok(c.name, 'uyum profilinin bir adı olmalı');
+  assert.ok(c.verdict, 'uyum profilinin bir özeti olmalı');
+  assert.ok(Array.isArray(c.predictions) && c.predictions.length > 0, 'tahmin listesi dolu olmalı');
+  assert.ok(c.confidence > 0 && c.confidence <= 1);
 });
 
 test('her arketip kimliği bir isim ve açıklama taşıyor', () => {

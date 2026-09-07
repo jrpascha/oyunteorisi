@@ -1,7 +1,8 @@
 # Oyun Teorisi
 
 İki kişinin bir bağlantı üzerinden karşı karşıya geldiği, çok turlu bir strateji oyunu.
-Maçın sonunda her oyuncunun tur geçmişinden strateji ve kişilik analizi çıkarılır.
+Maçın sonunda her oyuncunun tur geçmişinden strateji ve kişilik analizi, ayrıca ikilinin
+birlikte nasıl bir uyum sergilediğine dair gerçek hayat tahminleri çıkarılır.
 
 Oyunun altındaki model, oyun teorisinin klasik *tekrarlı mahkûm ikilemi* kurgusudur; bu terim
 kasıtlı olarak arayüzde geçmez, oyuncu yalnızca "işbirliği / ret" kararıyla karşılaşır.
@@ -67,6 +68,21 @@ Puan matrisindeki `S = 0` (işbirliği yapıp ihanete uğrayanın puanı) standa
 alınmıştır ve tek yerde tanımlıdır: [`server/gameLogic.js`](server/gameLogic.js) içindeki
 `PAYOFF`.
 
+## Kişilik ve uyum analizi
+
+Maç bitince sonuç ekranında iki katman analiz görünür:
+
+- **Kişilik/strateji arketipi** — her oyuncu için ayrı ayrı (Sadık İşbirlikçi, Kısasa Kısas,
+  Kindar, Fırsatçı vb.), o oyuncunun kendi hamle dizisinden çıkarılır.
+- **İkilinin Uyumu** — arketiplerden farklı olarak tek bir oyuncuyu değil, **ikiliyi** birlikte
+  değerlendirir: karşılıklı işbirliği/ret oranları, sömürü dengesi, kin ve affedicilik gibi
+  ilişki metriklerinden bir uyum profili (ör. "Güvene Dayalı Ortaklık", "Dengesiz İlişki",
+  "Karşılıklı Şahin") seçilir ve bu maçın gerçek sayılarına dayanan, gerçek hayattaki olası
+  senaryolara dair somut tahminler üretilir (ör. "uzun bir yolculuğa çıkabilir misiniz",
+  "ortak bir iş kurabilir misiniz"). Skor/tur grafiği yerine kasıtlı olarak bu tercih edildi —
+  ham bir çizgi grafiğin tek başına pek bir anlamı yok. Profiller ve mantık tek yerde:
+  [`server/analysis.js`](server/analysis.js) içindeki `COMPATIBILITY_PROFILES`.
+
 ## Dünya sıralaması
 
 `/siralama` sayfası, **yalnızca Dünya Çapında Oyna ile oynanan** maçların sonuçlarına göre
@@ -112,7 +128,7 @@ server/
   index.js       Express + Socket.IO; olay yönlendirme, eşleştirme kuyruğu
   gameStore.js   Bellek içi odalar, seçim kilitleme, tur çözümü, TTL temizliği
   gameLogic.js   Puan matrisi, tur sayısı üretimi, geçmiş penceresi
-  analysis.js    Davranış metrikleri + arketip sınıflandırma (saf fonksiyonlar)
+  analysis.js    Davranış metrikleri + arketip sınıflandırma + ikili uyum profilleri (saf fonksiyonlar)
   elo.js         ELO puanlama (saf fonksiyonlar)
   leaderboard.js Kalıcı sıralama + takma ad rezervasyonu (node:sqlite)
   nickname.js    Takma ad kuralları: temizleme + Türkçe'ye duyarlı benzersizlik anahtarı
@@ -135,7 +151,7 @@ etkilemez.
 ## Doğrulama
 
 ```bash
-npm test             # 59 birim testi (puan matrisi, pencere kuralı, oda akışı, arketipler, ELO, sıralama, takma ad)
+npm test             # 69 birim testi (puan matrisi, pencere kuralı, oda akışı, arketipler, uyum profilleri, ELO, sıralama, takma ad)
 npm run simulate     # bot istemcilerle uçtan uca özel maç + dünya çapında eşleşme + takma ad çakışması, sızıntı kontrolü
 npm run browser-check # sistemdeki Chrome ile tam akış: özel maç, eşleştirme, /siralama, takma ad reddi; screenshots/ altına ekran görüntüsü
 ```

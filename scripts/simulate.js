@@ -160,8 +160,11 @@ assert.ok(
 // Analiz
 const report = final.analysis.players[final.yourIndex];
 assert.ok(report.archetype.name, 'arketip üretilmemiş');
-assert.equal(final.analysis.cumulative[0].length, n);
 assert.equal(final.analysis.relationship.bestPossibleTogether, 6 * n);
+
+const compat = final.analysis.compatibility;
+assert.ok(compat && compat.name, 'uyum profili üretilmemiş');
+assert.ok(Array.isArray(compat.predictions) && compat.predictions.length > 0, 'uyum tahminleri boş');
 
 const aliceReport = final.analysis.players[final.yourIndex];
 const bobReport = final.analysis.players[1 - final.yourIndex];
@@ -171,6 +174,7 @@ console.log(`✔ Özel maç: ${n} tur oynandı (${Date.now() - started} ms)`);
 console.log(`✔ Alice ${final.players[final.yourIndex].score} puan — ${aliceReport.archetype.name}`);
 console.log(`✔ Bob   ${final.players[1 - final.yourIndex].score} puan — ${bobReport.archetype.name}`);
 console.log(`✔ Karşılıklı işbirliği: ${final.analysis.relationship.mutualCoopRounds} tur`);
+console.log(`✔ İkilinin uyumu: ${compat.name} (uyum ${Math.round(compat.confidence * 100)}%)`);
 
 // ---------- Senaryo 2: Dünya çapında eşleşme + ELO ----------
 

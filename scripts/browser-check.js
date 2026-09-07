@@ -333,10 +333,12 @@ step(`Maç ${round} turda bitti ve sonuç ekranı açıldı`);
 
 const result = await host.evaluate(() => ({
   summary: document.getElementById('result-summary').textContent,
-  personaCount: document.querySelectorAll('.persona').length,
-  personaNames: [...document.querySelectorAll('.persona-name')].map((e) => e.textContent),
+  personaCount: document.querySelectorAll('#personas .persona').length,
+  personaNames: [...document.querySelectorAll('#personas .persona-name')].map((e) => e.textContent),
   statCount: document.querySelectorAll('#relationship .stat').length,
-  chartPaths: document.querySelectorAll('#chart svg path').length,
+  compatibilityName: document.querySelector('#compatibility .persona-name')?.textContent,
+  compatibilityVerdict: document.querySelector('#compatibility .persona-tagline')?.textContent,
+  compatibilityPredictions: document.querySelectorAll('#compatibility .rules-list li').length,
   historyCols: document.querySelectorAll('#full-history .fh-col').length,
   turning: document.getElementById('turning-points').textContent,
   finalScores: [...document.querySelectorAll('.final-score .pts')].map((e) => e.textContent),
@@ -348,7 +350,11 @@ if (!(totalFromSummary >= 10 && totalFromSummary <= 20)) {
 }
 if (result.personaCount !== 2) problems.push('İki kişilik kartı bekleniyordu');
 if (result.statCount !== 8) problems.push(`İlişki kutusu sayısı 8 olmalı, bulunan: ${result.statCount}`);
-if (result.chartPaths !== 2) problems.push('Grafikte iki çizgi bekleniyordu');
+if (!result.compatibilityName) problems.push('İkilinin uyumu kartı bir isim göstermiyor');
+if (!result.compatibilityVerdict) problems.push('İkilinin uyumu kartı bir özet göstermiyor');
+if (result.compatibilityPredictions < 2) {
+  problems.push(`Uyum tahmin listesi çok kısa, bulunan: ${result.compatibilityPredictions}`);
+}
 if (result.historyCols !== totalFromSummary) {
   problems.push(`Tam geçmiş ${totalFromSummary} sütun olmalı, bulunan: ${result.historyCols}`);
 }
@@ -356,14 +362,15 @@ if (result.historyCols !== totalFromSummary) {
 await shot(host, '09-sonuc');
 await host.evaluate(() => document.getElementById('relationship').scrollIntoView());
 await shot(host, '10-iliski-ozeti');
-await host.evaluate(() => document.getElementById('chart').scrollIntoView());
-await shot(host, '11-puan-grafigi');
+await host.evaluate(() => document.getElementById('compatibility').scrollIntoView());
+await shot(host, '11-ikilinin-uyumu');
 await host.evaluate(() => document.getElementById('full-history').scrollIntoView());
 await shot(host, '12-tum-turlar');
 
 step(`Toplam tur ilk kez açıklandı: ${totalFromSummary}`);
 step(`Arketipler: ${result.personaNames.join(' / ')}`);
 step(`Puanlar: ${result.finalScores.join(' — ')}`);
+step(`İkilinin uyumu: ${result.compatibilityName} — "${result.compatibilityVerdict}"`);
 step(`Dönüm noktaları: ${result.turning}`);
 
 // ---------- 8. Bitmiş maça geri dönüş ----------

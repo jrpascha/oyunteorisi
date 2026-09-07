@@ -267,7 +267,7 @@
     renderRatingNote(final);
     renderPersonas(final);
     renderRelationship(final);
-    renderChart(final);
+    renderCompatibility(final);
     renderFullHistory(final);
   }
 
@@ -366,62 +366,27 @@
       .join('');
   }
 
-  function renderChart(final) {
-    const [c0, c1] = final.analysis.cumulative;
-    const me = final.yourIndex;
-    const series = [
-      { data: me === 0 ? c0 : c1, color: '#1f6f8b', name: final.players[me].nickname + ' (sen)' },
-      { data: me === 0 ? c1 : c0, color: '#c0392b', name: final.players[1 - me].nickname },
-    ];
+  /** İkilinin uyumu: kişilik kartlarıyla aynı görsel dili kullanan, çift düzeyinde bir kart. */
+  function renderCompatibility(final) {
+    const c = final.analysis.compatibility;
+    const predictions = c.predictions.map((p) => `<li>${escapeHtml(p)}</li>`).join('');
+    const runnerUp = c.runnerUp
+      ? `<p class="small muted">İkinci en yakın profil: <strong>${escapeHtml(c.runnerUp)}</strong></p>`
+      : '';
 
-    const W = 640;
-    const H = 220;
-    const pad = { l: 44, r: 12, t: 12, b: 26 };
-    const n = final.totalRounds;
-    const maxY = Math.max(1, ...series.map((s) => s.data[s.data.length - 1] || 0));
-
-    const x = (i) => pad.l + (i / Math.max(1, n - 1)) * (W - pad.l - pad.r);
-    const y = (v) => H - pad.b - (v / maxY) * (H - pad.t - pad.b);
-
-    const gridLines = [0, 0.25, 0.5, 0.75, 1]
-      .map((f) => {
-        const yy = y(maxY * f);
-        return `<line x1="${pad.l}" y1="${yy}" x2="${W - pad.r}" y2="${yy}" stroke="#2b2018" stroke-opacity="0.18" stroke-width="1"/>
-                <text x="${pad.l - 8}" y="${yy + 4}" fill="#7a6857" font-size="11" text-anchor="end">${Math.round(maxY * f)}</text>`;
-      })
-      .join('');
-
-    const paths = series
-      .map((s) => {
-        const d = s.data.map((v, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
-        return `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2.5" stroke-linejoin="round"/>`;
-      })
-      .join('');
-
-    // Uçtaki etiketler viewBox dışına taşmasın diye hizalamaları kenara çekiliyor.
-    const xLabels = [
-      { t: 1, anchor: 'start' },
-      { t: Math.round(n / 2), anchor: 'middle' },
-      { t: n, anchor: 'end' },
-    ]
-      .map(
-        ({ t, anchor }) =>
-          `<text x="${x(t - 1)}" y="${H - 6}" fill="#7a6857" font-size="11" text-anchor="${anchor}">${t}. tur</text>`,
-      )
-      .join('');
-
-    const legend = series
-      .map(
-        (s) =>
-          `<span><i class="swatch" style="background:${s.color}"></i> ${escapeHtml(s.name)}</span>`,
-      )
-      .join('');
-
-    $('chart').innerHTML =
-      `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block" role="img" aria-label="Tur tur puan birikimi">
-        ${gridLines}${paths}${xLabels}
-      </svg>
-      <div class="legend">${legend}</div>`;
+    $('compatibility').innerHTML = `
+      <div class="persona">
+        <div class="persona-head">
+          <div>
+            <div class="persona-owner">İkilinin uyumu</div>
+            <div class="persona-name">${escapeHtml(c.name)}</div>
+          </div>
+          <div class="persona-conf">uyum ${pct(c.confidence)}</div>
+        </div>
+        <div class="persona-tagline">${escapeHtml(c.verdict)}</div>
+        <ul class="rules-list">${predictions}</ul>
+        ${runnerUp}
+      </div>`;
   }
 
   function renderFullHistory(final) {
