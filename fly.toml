@@ -10,6 +10,11 @@ primary_region = 'fra'
 
 [env]
   LEADERBOARD_DB = '/data/leaderboard.db'
+  # Aynı uygulama oyunteorisi.fly.dev, oyunteorisionline.com ve
+  # www.oyunteorisionline.com'dan erişilebiliyor. localStorage kökene göre
+  # ayrıştığı için hangisinden girildiği takma ad/kimlik çakışmasına yol
+  # açabiliyordu — herkes tek adrese yönlendirilir.
+  CANONICAL_HOST = 'oyunteorisionline.com'
 
 [mounts]
   source = 'leaderboard_data'

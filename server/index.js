@@ -10,6 +10,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 const PORT = process.env.PORT || 3000;
 const DB_PATH = process.env.LEADERBOARD_DB || path.join(__dirname, '..', 'data', 'leaderboard.db');
+// Aynı uygulama birden fazla adresten erişilebilir olabilir (ör. platformun
+// verdiği *.fly.dev + özel alan adı). localStorage kökene göre ayrıştığı için
+// (worldId, takma ad) farklı adreslerden girmek farklı kimlik üretir — takma ad
+// çakışması gibi kafa karıştırıcı hatalara yol açar. Tek bir kanonik adrese
+// yönlendirerek bunu kökten engelliyoruz.
+const CANONICAL_HOST = process.env.CANONICAL_HOST || null;
 
 const app = express();
 const server = http.createServer(app);
@@ -20,6 +26,13 @@ const leaderboard = new Leaderboard(DB_PATH);
 // Dünya çapında eşleşme kuyruğu — sadece bellekte, her giriş bekleyen bir soketi temsil eder.
 /** @type {{ socketId: string, nickname: string, worldId: string }[]} */
 const matchQueue = [];
+
+if (CANONICAL_HOST) {
+  app.use((req, res, next) => {
+    if (req.hostname === CANONICAL_HOST) return next();
+    res.redirect(301, `https://${CANONICAL_HOST}${req.originalUrl}`);
+  });
+}
 
 app.use(express.static(PUBLIC_DIR));
 

@@ -151,7 +151,7 @@ etkilemez.
 ## Doğrulama
 
 ```bash
-npm test             # 69 birim testi (puan matrisi, pencere kuralı, oda akışı, arketipler, uyum profilleri, ELO, sıralama, takma ad)
+npm test             # 72 birim testi (puan matrisi, pencere kuralı, oda akışı, arketipler, uyum profilleri, ELO, sıralama, takma ad, kanonik adres)
 npm run simulate     # bot istemcilerle uçtan uca özel maç + dünya çapında eşleşme + takma ad çakışması, sızıntı kontrolü
 npm run browser-check # sistemdeki Chrome ile tam akış: özel maç, eşleştirme, /siralama, takma ad reddi; screenshots/ altına ekran görüntüsü
 ```
@@ -173,6 +173,12 @@ Fly.io ücretsiz katmanına doğrudan gider.
 - Port `PORT` ortam değişkeninden okunur
 - Veritabanı yolu isteğe bağlı `LEADERBOARD_DB` ortam değişkeninden okunur; verilmezse
   `data/leaderboard.db` kullanılır (klasör yoksa otomatik oluşturulur)
+- İsteğe bağlı `CANONICAL_HOST` ortam değişkeni verilirse, bu adresten farklı bir `Host`
+  başlığıyla gelen her istek 301 ile ona yönlendirilir. **Aynı uygulamaya birden fazla adresten
+  erişilebiliyorsa (ör. platformun verdiği `*.fly.dev` alt alanı + özel bir alan adı) bunu
+  mutlaka ayarla** — takma ad kimliği `localStorage`'da köken (origin) bazında tutulur, aynı
+  kişi farklı adreslerden girerse farklı bir kimlik ve "ad zaten alınmış" gibi kafa karıştırıcı
+  hatalarla karşılaşır.
 - Sağlık ucu: `GET /healthz`
 
 Davet bağlantısı tarayıcıdaki adresten üretildiği için hem `localhost`'ta hem canlıda doğru
